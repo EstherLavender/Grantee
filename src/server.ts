@@ -1,5 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
+import cors, { type CorsOptions } from "cors";
 
 // Polyfill BigInt serialization for JSON.stringify (safe to keep)
 (BigInt.prototype as any).toJSON = function () {
@@ -20,7 +21,6 @@ import { analyzeGithubRepo } from "./services/grantees/index.js";
 dotenv.config();
 
 const app = express();
-app.use(express.json());
 
 // -------------------------
 // Env + config
@@ -53,6 +53,72 @@ const AI_TEMPERATURE = process.env.AI_TEMPERATURE ? Number.parseFloat(process.en
 const AI_MAX_TOKENS = process.env.AI_MAX_TOKENS ? Number.parseInt(process.env.AI_MAX_TOKENS, 10) : undefined;
 const AI_SEED = process.env.AI_SEED ? Number.parseInt(process.env.AI_SEED, 10) : undefined;
 
+// -------------------------
+// ✅ CORS (fixes Lovable “failed to fetch” + preflight failures)
+// -------------------------
+// Put your exact deployed frontend origin here if you want to lock it down tightly.
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN; // e.g. https://grant-spark-api.lovable.app
+
+const allowedOrigins = new Set<string>([
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:5173",
+  ...(FRONTEND_ORIGIN ? [FRONTEND_ORIGIN] : []),
+]);
+
+const corsOptions: CorsOptions = {
+  origin: (origin, cb) => {
+    // Allow non-browser clients (curl, server-to-server) that send no Origin.
+    if (!origin) return cb(null, true);
+
+    // Allow exact matches
+    if (allowedOrigins.has(origin)) return cb(null, true);
+
+    // Allow Lovable subdomains (useful during iteration)
+    // Example: https://grant-spark-api.lovable.app
+    if (origin.endsWith(".lovable.app")) return cb(null, true);
+
+    // If you want to also allow lovable.app root:
+    if (origin === "https://lovable.app") return cb(null, true);
+
+    return cb(new Error(`CORS blocked for origin: ${origin}`), false);
+  },
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    // x402 / payment-related headers (keep permissive during dev)
+    "x402-payment-payload",
+    "x402-payment-status",
+    "x402-payment-required",
+    "x402-client",
+  ],
+  exposedHeaders: [
+    // if you ever choose to return x402 data via headers
+    "x402-payment-required",
+  ],
+  credentials: false,
+  optionsSuccessStatus: 204,
+};
+
+// Must come BEFORE routes
+app.use(cors(corsOptions));
+// Ensure caches don’t mix CORS responses across origins
+app.use((req, res, next) => {
+  res.setHeader("Vary", "Origin");
+  next();
+});
+// Handle preflight for all routes
+app.options("*", cors(corsOptions));
+
+// Body parsing after CORS is fine
+app.use(express.json({ limit: "1mb" }));
+
+// -------------------------
+// Supported networks
+// -------------------------
 const SUPPORTED_NETWORKS: string[] = [
   "base",
   "base-sepolia",
@@ -208,6 +274,10 @@ app.get("/health", (_req, res) => {
       network: NETWORK,
       price: "$0.10",
     },
+    cors: {
+      frontendOriginEnv: FRONTEND_ORIGIN || null,
+      notes: "CORS enabled; allows localhost + *.lovable.app + FRONTEND_ORIGIN if set.",
+    },
     endpoints: {
       githubAnalyzePaid: "POST /v1/github/analyze-paid",
       process: "POST /process (starter A2A demo)",
@@ -216,7 +286,7 @@ app.get("/health", (_req, res) => {
 });
 
 // -------------------------
-// ✅ Paid REST endpoint (the one your testClient + test-agent.sh uses)
+// ✅ Paid REST endpoint
 // -------------------------
 app.post("/v1/github/analyze-paid", async (req, res) => {
   try {
@@ -241,7 +311,7 @@ app.post("/v1/github/analyze-paid", async (req, res) => {
       });
     }
 
-    // 3) Validate request body (repoUrl, depth, etc.)
+    // 3) Validate request body
     const parsed = AnalyzeRepoRequest.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({
