@@ -1,0 +1,1 @@
+export { analyzeGithubRepo } from "./githubAnalyzeService";
