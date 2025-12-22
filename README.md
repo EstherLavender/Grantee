@@ -1,4 +1,4 @@
-# Grantees — x402-Paid Grant Intelligence & Capital Access API (Avalanche Fuji)
+# Grantees | x402-Paid Grant Intelligence & Capital Access API (Avalanche Fuji)
 
 Grantees is a **paid API** (x402 v2) that helps builders:
 - **Analyze a GitHub repo** (activity, languages, quality signals)
