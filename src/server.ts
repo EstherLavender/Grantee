@@ -1,7 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
 
-// Polyfill BigInt serialization for JSON.stringify (historically used for Solana, safe to keep)
+// Polyfill BigInt serialization for JSON.stringify (safe to keep)
 (BigInt.prototype as any).toJSON = function () {
   return this.toString();
 };
@@ -9,23 +9,24 @@ import dotenv from "dotenv";
 import { MerchantExecutor, type MerchantExecutorOptions } from "./MerchantExecutor.js";
 import type { PaymentPayload } from "@x402/core/types";
 
-// Keep starter-kit A2A types + ExampleService if you still want /process
+// Starter kit A2A types + ExampleService (optional, for /process)
 import { ExampleService } from "./ExampleService.js";
 import { EventQueue, Message, RequestContext, Task, TaskState } from "./x402Types.js";
 
-// ✅ Grantees REST handler
-import { githubAnalyze } from "./routes.js";
+// Grantees contracts + services (for /v1/github/analyze-paid)
+import { AnalyzeRepoRequest } from "./contracts/github.js";
+import { analyzeGithubRepo } from "./services/grantees/index.js";
 
 dotenv.config();
 
 const app = express();
 app.use(express.json());
 
-// Configuration
+// -------------------------
+// Env + config
+// -------------------------
 const PORT = process.env.PORT || 3000;
 const PAY_TO_ADDRESS = process.env.PAY_TO_ADDRESS;
-
-// ✅ Default to avalanche-fuji for this project
 const NETWORK = process.env.NETWORK || "avalanche-fuji";
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
@@ -41,7 +42,6 @@ const SETTLEMENT_MODE_ENV = process.env.SETTLEMENT_MODE?.toLowerCase();
 const ASSET_ADDRESS = process.env.ASSET_ADDRESS;
 const ASSET_NAME = process.env.ASSET_NAME;
 const EXPLORER_URL = process.env.EXPLORER_URL;
-
 const CHAIN_ID = process.env.CHAIN_ID ? Number.parseInt(process.env.CHAIN_ID, 10) : undefined;
 
 const AI_PROVIDER = (process.env.AI_PROVIDER || "openai").toLowerCase();
@@ -53,7 +53,6 @@ const AI_TEMPERATURE = process.env.AI_TEMPERATURE ? Number.parseFloat(process.en
 const AI_MAX_TOKENS = process.env.AI_MAX_TOKENS ? Number.parseInt(process.env.AI_MAX_TOKENS, 10) : undefined;
 const AI_SEED = process.env.AI_SEED ? Number.parseInt(process.env.AI_SEED, 10) : undefined;
 
-// Supported networks (you can keep this broad; Grantees defaults to Fuji)
 const SUPPORTED_NETWORKS: string[] = [
   "base",
   "base-sepolia",
@@ -78,7 +77,9 @@ const SUPPORTED_NETWORKS: string[] = [
   "eip155:3338",
 ];
 
+// -------------------------
 // Validate env
+// -------------------------
 if (!PAY_TO_ADDRESS) {
   console.error("❌ PAY_TO_ADDRESS is required");
   process.exit(1);
@@ -92,7 +93,7 @@ if (!isValidNetwork) {
   process.exit(1);
 }
 
-// AI validation (only needed if you keep /process + ExampleService)
+// If you keep /process, AI provider must be configured
 if (AI_PROVIDER === "openai") {
   if (!OPENAI_API_KEY) {
     console.error("❌ OPENAI_API_KEY is required when AI_PROVIDER=openai");
@@ -127,9 +128,9 @@ if (settlementMode === "direct" && !PRIVATE_KEY) {
   process.exit(1);
 }
 
-// -------------------------------------------------------------------------------------
-// Optional starter service (kept for /process)
-// -------------------------------------------------------------------------------------
+// -------------------------
+// Optional starter /process service
+// -------------------------
 const exampleService = new ExampleService({
   provider: AI_PROVIDER === "eigenai" ? "eigenai" : "openai",
   apiKey: AI_PROVIDER === "openai" ? OPENAI_API_KEY : undefined,
@@ -143,16 +144,16 @@ const exampleService = new ExampleService({
   seed: AI_PROVIDER === "eigenai" ? AI_SEED : undefined,
 });
 
-// -------------------------------------------------------------------------------------
-// Merchant Executor (single executor for now; you can create multiple per-route later)
-// -------------------------------------------------------------------------------------
+// -------------------------
+// Merchant Executor
+// -------------------------
 const merchantOptions: MerchantExecutorOptions = {
   payToAddress: PAY_TO_ADDRESS,
   network: NETWORK,
   price: 0.1,
 
-  // ✅ Grantees route metadata (these show up in the 402 response)
-  route: "/v1/github/analyze",
+  // ✅ Align metadata with the paid endpoint
+  route: "/v1/github/analyze-paid",
   resourceName: "Grantees GitHub Repo Analysis",
   resourceDescription: "Analyzes a GitHub repo, scores quality, and matches Avalanche-aligned grants.",
   mimeType: "application/json",
@@ -171,15 +172,16 @@ const merchantOptions: MerchantExecutorOptions = {
 
 const merchantExecutor = new MerchantExecutor(merchantOptions);
 
-// Initialize (async for facilitator mode)
 async function initializeMerchant() {
   await merchantExecutor.initialize();
 }
 
+// -------------------------
 // Logging
+// -------------------------
 if (settlementMode === "direct") {
-  console.log("🧩 Using local settlement (direct EIP-3009 via RPC)");
-  console.log(`🔌 RPC endpoint: ${RPC_URL || "using default for selected network"}`);
+  console.log("🧩 Using direct settlement (EIP-3009 via RPC)");
+  console.log(`🔌 RPC endpoint: ${RPC_URL || "default for selected network"}`);
 } else if (FACILITATOR_URL) {
   console.log(`🌐 Using custom facilitator: ${FACILITATOR_URL}`);
 } else {
@@ -187,14 +189,14 @@ if (settlementMode === "direct") {
   console.log("⚠️  Note: Default facilitator only supports TESTNETS");
 }
 
-console.log("🚀 Grantees x402 Payment API initialized");
+console.log("🚀 Grantees x402 API initialized");
 console.log(`💰 Payment address: ${PAY_TO_ADDRESS}`);
 console.log(`🌐 Network: ${NETWORK}`);
 console.log("💵 Price per request: $0.10 USDC");
 
-// -------------------------------------------------------------------------------------
+// -------------------------
 // Health
-// -------------------------------------------------------------------------------------
+// -------------------------
 app.get("/health", (_req, res) => {
   res.json({
     status: "healthy",
@@ -207,86 +209,30 @@ app.get("/health", (_req, res) => {
       price: "$0.10",
     },
     endpoints: {
-      githubAnalyze: "POST /v1/github/analyze",
+      githubAnalyzePaid: "POST /v1/github/analyze-paid",
       process: "POST /process (starter A2A demo)",
     },
   });
 });
 
-// -------------------------------------------------------------------------------------
-// ✅ Grantees Paid REST Endpoint: POST /v1/github/analyze
-// Body: AnalyzeRepoRequest
-// Payment: x402.payment.payload in body or x402-payment-payload header
-// -------------------------------------------------------------------------------------
-app.post("/v1/github/analyze", async (req, res) => {
-  try {
-    // Accept payment payload from either header or body
-    const headerPayload = req.headers["x402-payment-payload"];
-    const bodyPayload = req.body?.paymentPayload;
-
-    const paymentPayload: PaymentPayload | undefined =
-      typeof headerPayload === "string"
-        ? (JSON.parse(headerPayload) as PaymentPayload)
-        : bodyPayload;
-
-    // If no payment, return 402 with requirements
-    if (!paymentPayload) {
-      const paymentRequired = merchantExecutor.createPaymentRequiredResponse();
-      return res.status(402).json(paymentRequired);
-    }
-
-    // Verify
-    const verifyResult = await merchantExecutor.verifyPayment(paymentPayload);
-    if (!verifyResult.isValid) {
-      return res.status(402).json({
-        error: "Payment verification failed",
-        reason: verifyResult.invalidReason || "Invalid payment",
-      });
-    }
-
-    // ✅ Run the actual Grantees handler (your routes.ts)
-    // We pass through the same request body your handler expects.
-    // (repoUrl, depth, chainHint, etc.)
-    await githubAnalyze(req, res);
-
-    // If handler already sent a response, we can't settle after sending.
-    // So we settle BEFORE sending: easiest is to compute result first then respond.
-    // BUT your handler currently sends res.json(result).
-    //
-    // Therefore we need a safer pattern:
-    // - call service directly here
-    // - then settle
-    // - then respond once
-  } catch (error: any) {
-    console.error("❌ /v1/github/analyze error:", error);
-    return res.status(500).json({ error: error?.message || "Internal server error" });
-  }
-});
-
-// -------------------------------------------------------------------------------------
-// ⭐ IMPORTANT FIX: Paid endpoint must settle BEFORE responding.
-// The above direct handler call responds too early.
-// So we implement a proper paid analyze route below and disable the one above.
-// -------------------------------------------------------------------------------------
-
-import { AnalyzeRepoRequest } from "./contracts/github.js";
-import { analyzeGithubRepo } from "./services/grantees/index.js";
-
+// -------------------------
+// ✅ Paid REST endpoint (the one your testClient + test-agent.sh uses)
+// -------------------------
 app.post("/v1/github/analyze-paid", async (req, res) => {
   try {
     const headerPayload = req.headers["x402-payment-payload"];
     const bodyPayload = req.body?.paymentPayload;
 
     const paymentPayload: PaymentPayload | undefined =
-      typeof headerPayload === "string"
-        ? (JSON.parse(headerPayload) as PaymentPayload)
-        : bodyPayload;
+      typeof headerPayload === "string" ? (JSON.parse(headerPayload) as PaymentPayload) : bodyPayload;
 
+    // 1) If no payment => 402 requirements
     if (!paymentPayload) {
       const paymentRequired = merchantExecutor.createPaymentRequiredResponse();
       return res.status(402).json(paymentRequired);
     }
 
+    // 2) Verify payment
     const verifyResult = await merchantExecutor.verifyPayment(paymentPayload);
     if (!verifyResult.isValid) {
       return res.status(402).json({
@@ -295,7 +241,7 @@ app.post("/v1/github/analyze-paid", async (req, res) => {
       });
     }
 
-    // Parse request body (strip paymentPayload if client included it)
+    // 3) Validate request body (repoUrl, depth, etc.)
     const parsed = AnalyzeRepoRequest.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({
@@ -304,15 +250,16 @@ app.post("/v1/github/analyze-paid", async (req, res) => {
       });
     }
 
-    // Run Grantees service logic
+    // 4) Run service logic
     const result = await analyzeGithubRepo(parsed.data, {
       chainDefault: "avalanche-fuji",
       githubToken: process.env.GITHUB_TOKEN,
     });
 
-    // Settle payment
+    // 5) Settle payment
     const settlement = await merchantExecutor.settlePayment(paymentPayload);
 
+    // 6) Respond once
     return res.json({
       success: settlement.success,
       payer: verifyResult.payer,
@@ -325,9 +272,9 @@ app.post("/v1/github/analyze-paid", async (req, res) => {
   }
 });
 
-// -------------------------------------------------------------------------------------
-// Starter kit A2A endpoint (kept)
-// -------------------------------------------------------------------------------------
+// -------------------------
+// Starter kit A2A endpoint (kept as-is)
+// -------------------------
 app.post("/process", async (req, res) => {
   try {
     console.log("\n📥 Received request");
@@ -483,8 +430,7 @@ async function startServer() {
   app.listen(PORT, () => {
     console.log(`\n✅ Server running on http://localhost:${PORT}`);
     console.log(`📖 Health check: http://localhost:${PORT}/health`);
-    console.log(`🚀 Grantees paid endpoint: POST http://localhost:${PORT}/v1/github/analyze-paid`);
-    console.log(`🧪 Test endpoint: POST http://localhost:${PORT}/test`);
+    console.log(`🚀 Paid endpoint: POST http://localhost:${PORT}/v1/github/analyze-paid`);
     console.log(`🧩 Starter A2A endpoint: POST http://localhost:${PORT}/process\n`);
   });
 }
