@@ -1,0 +1,12 @@
+[
+  {
+    "id": "avax-fuji-builders-001",
+    "program": "Avalanche Builders (Fuji-friendly)",
+    "ecosystem": "Avalanche",
+    "chains": ["avalanche", "avalanche-fuji", "eip155:43113"],
+    "tags": ["evm", "infra", "consumer", "defi", "gaming"],
+    "preferredLanguages": ["Solidity", "TypeScript"],
+    "minQualityScore": 45,
+    "notes": "Fuji testnet acceptable for prototypes; prioritize Avalanche-aligned demos."
+  }
+]
