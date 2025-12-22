@@ -1,42 +1,47 @@
 {
-  "name": "x402-starter-kit",
-  "version": "0.0.1",
-  "description": "Starter kit for building paid APIs using the x402 payment protocol",
-  "main": "dist/server.js",
+  "name": "grantees-x402-api",
+  "version": "0.1.0",
+  "description": "Grantees – Grant Intelligence & Capital Access API using x402 on Avalanche Fuji",
   "type": "module",
+  "main": "dist/server.js",
   "bin": {
     "create-x402": "./cli.js"
   },
   "scripts": {
+    "clean": "rmdir /s /q dist || exit 0",
+
     "build": "tsc",
-    "start": "node dist/server.js",
-    "start:facilitator": "node dist/facilitator.js",
-    "dev": "tsc && node dist/server.js",
+
+    "dev:server": "tsc && node dist/server.js",
     "dev:facilitator": "tsc && node dist/facilitator.js",
-    "test": "npm run build && node dist/testClient.js",
-    "test:solana": "npm run build && node dist/testClientSolana.js",
-    "test:shell": "bash test-request.sh",
-    "setup:solana": "npm run build && node dist/setupSolanaWallets.js",
-    "clean": "rm -rf dist"
+
+    "start:server": "node dist/server.js",
+    "start:facilitator": "node dist/facilitator.js",
+
+    "dev": "npm run dev:server",
+    "start": "npm run start:server",
+
+    "dev:all": "powershell -Command \"Start-Process node 'dist/facilitator.js'; Start-Process node 'dist/server.js'\"",
+    "start:all": "powershell -Command \"Start-Process node 'dist/facilitator.js'; Start-Process node 'dist/server.js'\"",
+
+    "test": "npm run build && node dist/testClient.js"
   },
   "keywords": [
     "x402",
-    "payment-api",
-    "payments",
+    "avalanche",
+    "avalanche-fuji",
     "usdc",
     "eip-3009",
-    "solana",
-    "svm"
+    "paid-api",
+    "web3",
+    "grants",
+    "capital-access"
   ],
-  "author": "",
+  "author": "Grantees",
   "license": "MIT",
   "dependencies": {
-    "@scure/base": "^2.0.0",
-    "@solana/spl-token": "^0.4.9",
-    "@solana/web3.js": "^1.98.0",
     "@x402/core": "^2.0.0",
     "@x402/evm": "^2.0.0",
-    "@x402/svm": "^2.0.0",
     "dotenv": "^16.4.5",
     "ethers": "^6.15.0",
     "express": "^4.21.2",
