@@ -266,4 +266,3 @@ License
 
 MIT
 
-If you paste your current `src/services/grantees/index.ts` + `src/contracts/github.ts`, I’ll tailor the README “API Response Schema” section to exactly match what your service returns (so it’s accurate for users).
