@@ -646,10 +646,22 @@ export class MerchantExecutor {
   }
 
   private buildEip712Domain(requirements: PaymentRequirements) {
+    // Determine chainId: use stored chainId, extract from CAIP-2, or default to Fuji
+    let chainId = this.chainId;
+    if (!chainId && this.network.startsWith("eip155:")) {
+      const chainIdStr = this.network.split(":")[1];
+      chainId = Number.parseInt(chainIdStr, 10);
+    }
+    // Fallback to Fuji (43113) if still undefined
+    if (!chainId) {
+      console.warn("⚠️  chainId undefined; using Fuji default (43113)");
+      chainId = 43113;
+    }
+
     return {
       name: (requirements.extra?.name as string) || this.assetName,
       version: (requirements.extra?.version as string) || "2",
-      chainId: this.chainId,
+      chainId,
       verifyingContract: requirements.asset,
     };
   }
