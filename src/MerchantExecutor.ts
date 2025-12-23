@@ -400,9 +400,21 @@ export class MerchantExecutor {
       this.resourceDescription ??
       "Paid endpoint for grant intelligence + capital access insights.";
 
+    // Ensure amount fields are present and stringified for clients (defensive)
+    const reqCopy = { ...this.requirements } as any;
+    if (!reqCopy.amount && reqCopy.extra?.amount) {
+      reqCopy.amount = String(reqCopy.extra.amount);
+    }
+    if (!reqCopy.amount) {
+      // Fallback to 0.1 USDC in micro-units
+      reqCopy.amount = this.getAtomicAmount(0.1);
+    }
+    // Provide a maxAmountRequired field for older clients
+    reqCopy.maxAmountRequired = reqCopy.amount;
+
     return {
       x402Version: 2,
-      accepts: [this.requirements],
+      accepts: [reqCopy],
       error: `Payment required for Grantees: ${route}`,
       resource: {
         name: resourceName,
