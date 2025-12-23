@@ -1,11 +1,11 @@
 // src/services/grantees/githubAnalyzeService.ts
-import type { AnalyzeRepoRequest, AnalyzeRepoResponse } from "../../contracts/github";
+import type { AnalyzeRepoRequest, AnalyzeRepoResponse } from "../../contracts/github.js";
 
-import { parseRepoUrl } from "../github/parseRepoUrl";
-import { fetchRepoSignals } from "../github/fetchRepoSignals";
-import { qualityScore } from "../scoring/qualityScore";
-import { loadGrants } from "../grants/grantsRepo";
-import { matchGrants } from "../grants/matcher";
+import { parseRepoUrl } from "../github/parseRepoUrl.js";
+import { fetchRepoSignals } from "../github/fetchRepoSignals.js";
+import { qualityScore } from "../scoring/qualityScore.js";
+import { loadGrants } from "../grants/grantsRepo.js";
+import { matchGrants } from "../grants/matcher.js";
 
 export async function analyzeGithubRepo(
   input: AnalyzeRepoRequest,

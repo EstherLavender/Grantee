@@ -2,19 +2,29 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "NodeNext",
-    "lib": ["ES2022"],
-    "moduleResolution": "nodenext",
+    "moduleResolution": "NodeNext",
+
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+
     "outDir": "./dist",
     "rootDir": "./src",
+
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
+
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/testClient.ts",
+    "src/facilitator.ts"
+  ]
 }

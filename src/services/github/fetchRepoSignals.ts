@@ -1,4 +1,4 @@
-import { gh } from "./githubClient";
+import { gh } from "./githubClient.js";
 
 type RepoMeta = {
   default_branch: string;
@@ -23,7 +23,7 @@ export async function fetchRepoSignals(owner: string, repo: string, token?: stri
   const recentAuthors = Array.from(
     new Set(
       commits
-        .map((c) => c?.author?.login || c?.commit?.author?.name || null)
+        .map((c: Commit) => c?.author?.login || c?.commit?.author?.name || null)
         .filter(Boolean) as string[],
     ),
   ).slice(0, 10);

@@ -1,1 +1,1 @@
-export { analyzeGithubRepo } from "./githubAnalyzeService";
+export { analyzeGithubRepo } from "./githubAnalyzeService.js";

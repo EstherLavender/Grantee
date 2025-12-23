@@ -4,12 +4,17 @@ import { Wallet } from "ethers";
 
 dotenv.config();
 
-// Polyfill BigInt serialization for JSON.stringify (safe, though we use EVM here)
+// Polyfill BigInt serialization for JSON.stringify (safe to keep)
 (BigInt.prototype as any).toJSON = function () {
   return this.toString();
 };
 
-const API_URL = process.env.AGENT_URL || process.env.API_URL || process.env.PUBLIC_BASE_URL || "http://localhost:3000";
+const API_URL =
+  process.env.AGENT_URL ||
+  process.env.API_URL ||
+  process.env.PUBLIC_BASE_URL ||
+  "http://localhost:3000";
+
 const CLIENT_PRIVATE_KEY = process.env.CLIENT_PRIVATE_KEY;
 
 // Your Grantees paid endpoint
@@ -30,19 +35,19 @@ const TRANSFER_AUTH_TYPES = {
 type PaymentRequirements = {
   scheme: string;
   network: string; // eip155:43113 OR legacy
-  asset: string;   // USDC contract
+  asset: string; // USDC contract
   payTo: string;
   amount?: string; // v2
   maxAmountRequired?: string; // fallback
   maxTimeoutSeconds?: number;
-  extra?: Record<string, any>;
+  extra?: Record<string, unknown>;
 };
 
 type PaymentRequiredResponse = {
   x402Version: number;
   accepts: PaymentRequirements[];
   error?: string;
-  resource?: any;
+  resource?: unknown;
 };
 
 type PaymentPayloadV2 = {
@@ -53,7 +58,7 @@ type PaymentPayloadV2 = {
     payTo: string;
     amount: string;
     maxTimeoutSeconds: number;
-    extra?: Record<string, any>;
+    extra?: Record<string, unknown>;
   };
   payload: {
     signature: string;
@@ -104,19 +109,34 @@ function chainIdFromNetwork(network: string): number {
   return id;
 }
 
-async function postJson(url: string, body: any): Promise<{ status: number; json: any; text: string }> {
+async function safeJson(res: Response): Promise<Record<string, unknown> | null> {
+  try {
+    const text = await res.text();
+    if (!text) return null;
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+async function postJson(
+  url: string,
+  body: unknown,
+): Promise<{ status: number; json: Record<string, unknown> | null; text: string }> {
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+
   const text = await res.text();
-  let json: any = null;
+  let json: Record<string, unknown> | null = null;
   try {
-    json = JSON.parse(text);
+    json = text ? (JSON.parse(text) as Record<string, unknown>) : null;
   } catch {
     // ignore
   }
+
   return { status: res.status, json, text };
 }
 
@@ -127,17 +147,22 @@ function pickEvmRequirement(paymentRequired: PaymentRequiredResponse): PaymentRe
 
   // Prefer EVM (eip155:*). If server returns legacy avalanche-fuji, also accept.
   const evm = paymentRequired.accepts.find(
-    (r) => r.network?.startsWith("eip155:") || r.network === "avalanche-fuji" || r.network === "avalanche"
+    (r) => r.network?.startsWith("eip155:") || r.network === "avalanche-fuji" || r.network === "avalanche",
   );
+
   if (!evm) {
     throw new Error(
-      `No EVM payment option found. Available: ${paymentRequired.accepts.map((r) => r.network).join(", ")}`
+      `No EVM payment option found. Available: ${paymentRequired.accepts.map((r) => r.network).join(", ")}`,
     );
   }
+
   return evm;
 }
 
-async function createPaymentPayloadEvm(paymentRequired: PaymentRequiredResponse, wallet: Wallet): Promise<PaymentPayloadV2> {
+async function createPaymentPayloadEvm(
+  paymentRequired: PaymentRequiredResponse,
+  wallet: Wallet,
+): Promise<PaymentPayloadV2> {
   const req = pickEvmRequirement(paymentRequired);
 
   const requiredAmount = req.amount ?? req.maxAmountRequired;
@@ -156,8 +181,8 @@ async function createPaymentPayloadEvm(paymentRequired: PaymentRequiredResponse,
   };
 
   const domain = {
-    name: req.extra?.name || "USDC",
-    version: req.extra?.version || "2",
+    name: (req.extra?.["name"] as string | undefined) || "USDC",
+    version: (req.extra?.["version"] as string | undefined) || "2",
     chainId: chainIdFromNetwork(req.network),
     verifyingContract: req.asset,
   };
@@ -172,7 +197,7 @@ async function createPaymentPayloadEvm(paymentRequired: PaymentRequiredResponse,
       payTo: req.payTo,
       amount: String(requiredAmount),
       maxTimeoutSeconds: req.maxTimeoutSeconds ?? 600,
-      extra: req.extra ?? {},
+      extra: (req.extra ?? {}) as Record<string, unknown>,
     },
     payload: { signature, authorization },
   };
@@ -188,7 +213,7 @@ export class GranteesEvmTestClient {
   async checkHealth(): Promise<void> {
     console.log("\n🏥 Checking API health...");
     const res = await fetch(`${this.apiUrl}/health`);
-    const data = await res.json().catch(() => ({}));
+    const data = (await safeJson(res)) ?? {};
 
     if (!res.ok) {
       console.log("❌ Health check failed:", res.status, res.statusText);
@@ -197,10 +222,12 @@ export class GranteesEvmTestClient {
     }
 
     console.log("✅ API is healthy");
-    console.log(`   Service: ${data.service}`);
-    console.log(`   Version: ${data.version}`);
-    console.log(`   Network: ${data.payment?.network}`);
-    console.log(`   Price: ${data.payment?.price}`);
+    console.log(`   Service: ${String(data["service"] ?? "")}`);
+    console.log(`   Version: ${String(data["version"] ?? "")}`);
+
+    const payment = (data["payment"] as Record<string, unknown> | undefined) ?? {};
+    console.log(`   Network: ${String(payment["network"] ?? "")}`);
+    console.log(`   Price: ${String(payment["price"] ?? "")}`);
   }
 
   /**
@@ -218,16 +245,23 @@ export class GranteesEvmTestClient {
       throw new Error(`Expected 402 Payment Required but got ${status}`);
     }
 
-    if (!json?.accepts) {
+    if (!json || !Array.isArray((json as any).accepts)) {
       console.log("❌ 402 returned but missing accepts[] payload:");
       console.log(text);
       throw new Error("Payment required response missing accepts[]");
     }
 
+    const parsed: PaymentRequiredResponse = {
+      x402Version: Number((json as any).x402Version ?? 2),
+      accepts: (json as any).accepts as PaymentRequirements[],
+      error: (json as any).error,
+      resource: (json as any).resource,
+    };
+
     console.log("✅ Got 402 Payment Required");
-    console.log(`   x402Version: ${json.x402Version}`);
-    console.log(`   options: ${json.accepts.length}`);
-    return json as PaymentRequiredResponse;
+    console.log(`   x402Version: ${parsed.x402Version}`);
+    console.log(`   options: ${parsed.accepts.length}`);
+    return parsed;
   }
 
   /**
@@ -306,8 +340,14 @@ async function main() {
   console.log("\n✅ Tests complete!");
 }
 
-// Run if called directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Run if executed directly (works for both ts-node/tsx and compiled JS)
+const ranDirectly =
+  typeof process !== "undefined" &&
+  Array.isArray(process.argv) &&
+  typeof process.argv[1] === "string" &&
+  /testClient\.(ts|js)$/.test(process.argv[1]);
+
+if (ranDirectly) {
   main().catch((err) => {
     console.error("❌ Test client crashed:", err);
     process.exit(1);

@@ -1,11 +1,25 @@
 import type { z } from "zod";
-import type { GrantProgram } from "../../contracts/grants";
+import type { GrantProgram } from "../../contracts/grants.js";
 
-function normalize(s: string) {
+type Grant = z.infer<typeof GrantProgram>;
+
+function normalize(s: string): string {
   return s.trim().toLowerCase();
 }
 
-function topLanguages(languages?: Record<string, number>, n = 5): string[] {
+/**
+ * Defensive helper: your zod schema might allow unknown/any here.
+ * This ensures we only work with strings.
+ */
+function asStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((v): v is string => typeof v === "string");
+}
+
+function topLanguages(
+  languages?: Record<string, number>,
+  n: number = 5,
+): string[] {
   if (!languages) return [];
   return Object.entries(languages)
     .sort((a, b) => b[1] - a[1])
@@ -13,23 +27,33 @@ function topLanguages(languages?: Record<string, number>, n = 5): string[] {
     .map(([name]) => name);
 }
 
+export type GrantMatch = {
+  grantId: string;
+  program: string;
+  fitScore: number;
+  why: string[];
+};
+
 export function matchGrants(input: {
-  grants: z.infer<typeof GrantProgram>[];
+  grants: Grant[];
   qualityScore: number;
   repoLanguages?: Record<string, number>;
   extraTags?: string[];
-  chainHint?: string; // "avalanche-fuji"
-}) {
-  const repoLangs = topLanguages(input.repoLanguages).map(normalize);
-  const tags = (input.extraTags ?? []).map(normalize);
-  const chainHint = input.chainHint ? normalize(input.chainHint) : undefined;
+  chainHint?: string; // e.g. "avalanche-fuji" or "eip155:43113"
+}): GrantMatch[] {
+  const repoLangs: string[] = topLanguages(input.repoLanguages).map(normalize);
+  const tags: string[] = (input.extraTags ?? []).map(normalize);
+  const chainHint: string | undefined = input.chainHint
+    ? normalize(input.chainHint)
+    : undefined;
 
   return input.grants
-    .map((g) => {
+    .map((g): GrantMatch => {
       const why: string[] = [];
       let rawScore = 0;
 
-      const minQ = g.minQualityScore ?? 0;
+      // ---- Quality threshold ----
+      const minQ: number = g.minQualityScore ?? 0;
       if (input.qualityScore >= minQ) {
         rawScore += 10;
         why.push(`Quality score meets threshold (${input.qualityScore} ≥ ${minQ})`);
@@ -38,7 +62,9 @@ export function matchGrants(input: {
         why.push(`Below typical threshold (${input.qualityScore} < ${minQ})`);
       }
 
-      const grantChains = (g.chains ?? []).map(normalize);
+      // ---- Chain alignment ----
+      const grantChains: string[] = asStringArray(g.chains).map(normalize);
+
       if (chainHint && grantChains.includes(chainHint)) {
         rawScore += 20;
         why.push(`Aligned with chain: ${chainHint}`);
@@ -47,21 +73,25 @@ export function matchGrants(input: {
         why.push("Broad EVM-compatible program");
       }
 
-      const preferred = (g.preferredLanguages ?? []).map(normalize);
-      const langHits = preferred.filter((p) => repoLangs.includes(p));
+      // ---- Language fit ----
+      const preferred: string[] = asStringArray(g.preferredLanguages).map(normalize);
+      const langHits: string[] = preferred.filter((p: string) => repoLangs.includes(p));
+
       if (langHits.length) {
         rawScore += Math.min(15, langHits.length * 6);
         why.push(`Preferred languages: ${langHits.join(", ")}`);
       }
 
-      const grantTags = (g.tags ?? []).map(normalize);
-      const tagHits = grantTags.filter((t) => tags.includes(t));
+      // ---- Tag fit ----
+      const grantTags: string[] = asStringArray(g.tags).map(normalize);
+      const tagHits: string[] = grantTags.filter((t: string) => tags.includes(t));
+
       if (tagHits.length) {
         rawScore += Math.min(20, tagHits.length * 5);
         why.push(`Relevant tags: ${tagHits.join(", ")}`);
       }
 
-      const fitScore = Math.max(0, Math.min(100, Math.round(rawScore + 50)));
+      const fitScore: number = Math.max(0, Math.min(100, Math.round(rawScore + 50)));
 
       return {
         grantId: g.id,

@@ -1,7 +1,7 @@
 // src/routes.ts
 import type { Request, Response } from "express";
-import { AnalyzeRepoRequest } from "./contracts/github";
-import { analyzeGithubRepo } from "./services/grantees";
+import { AnalyzeRepoRequest } from "./contracts/github.js";
+import { analyzeGithubRepo } from "./services/grantees/index.js";
 
 /**
  * POST /v1/github/analyze
