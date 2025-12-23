@@ -1,13 +1,11 @@
-import fs from "node:fs";
-import path from "node:path";
+// src/services/grants/grantsRepo.ts
+import { GRANTS } from "../../data/grants.js";
 import { GrantProgram } from "../../contracts/grants.js";
 import type { z } from "zod";
 
 type Grant = z.infer<typeof GrantProgram>;
 
 export function loadGrants(): Grant[] {
-  const filePath = path.join(process.cwd(), "src", "data", "grants.seed.json");
-  const raw = fs.readFileSync(filePath, "utf-8");
-  const parsed: unknown = JSON.parse(raw);
-  return GrantProgram.array().parse(parsed);
+  // Validate the seed data at runtime (keeps your safety)
+  return GrantProgram.array().parse(GRANTS);
 }
