@@ -71,17 +71,10 @@ const corsOptions: CorsOptions = {
     return cb(new Error(`CORS blocked for origin: ${origin}`), false);
   },
   methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization",
-    "X-Requested-With",
-    // x402 related
-    "x402-payment-payload",
-    "x402-payment-status",
-    "x402-payment-required",
-    "x402-client",
-  ],
-  exposedHeaders: ["x402-payment-required"],
+  // For quick testing only: allow all request headers so browser preflight won't block.
+  // WARNING: do NOT use "*" in production; restrict to specific headers.
+  allowedHeaders: ["*"],
+  exposedHeaders: ["*"],
   credentials: false,
   optionsSuccessStatus: 204,
 };
@@ -317,11 +310,22 @@ app.get("/v1/wallet/:address", async (req, res) => {
 // ✅ Paid REST endpoint
 app.post("/v1/github/analyze-paid", async (req, res) => {
   try {
-    const headerPayload = req.headers["x402-payment-payload"];
+    // Accept either hyphenated or non-hyphenated header variants
+    const headerPayloadRaw = (req.headers["x402-payment-payload"] || req.headers["x-402-payment-payload"]) as
+      | string
+      | undefined;
     const bodyPayload = req.body?.paymentPayload;
 
-    const paymentPayload: PaymentPayload | undefined =
-      typeof headerPayload === "string" ? (JSON.parse(headerPayload) as PaymentPayload) : bodyPayload;
+    let paymentPayload: PaymentPayload | undefined;
+    if (typeof headerPayloadRaw === "string") {
+      try {
+        paymentPayload = JSON.parse(headerPayloadRaw) as PaymentPayload;
+      } catch (err: any) {
+        return res.status(400).json({ error: "Invalid JSON in x402 payment header", details: err?.message });
+      }
+    } else {
+      paymentPayload = bodyPayload;
+    }
 
     // 1) If no payment => 402 requirements
     if (!paymentPayload) {
