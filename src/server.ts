@@ -7,6 +7,7 @@ import cors, { type CorsOptions } from "cors";
 };
 
 import { MerchantExecutor, type MerchantExecutorOptions } from "./MerchantExecutor.js";
+import { ethers } from "ethers";
 import type { PaymentPayload } from "@x402/core/types";
 
 import { AnalyzeRepoRequest } from "./contracts/github.js";
@@ -64,8 +65,8 @@ const corsOptions: CorsOptions = {
 
     if (allowedOrigins.has(origin)) return cb(null, true);
 
-    // Allow Lovable subdomains during iteration
-    if (origin.endsWith(".lovable.app")) return cb(null, true);
+    // Allow Lovable subdomains (both .lovable.app and .lovableproject.com)
+    if (origin.endsWith(".lovable.app") || origin.endsWith(".lovableproject.com")) return cb(null, true);
 
     return cb(new Error(`CORS blocked for origin: ${origin}`), false);
   },
@@ -224,6 +225,93 @@ app.get("/health", (_req, res) => {
       githubAnalyzePaid: "POST /v1/github/analyze-paid",
     },
   });
+});
+
+// Wallet info endpoint — returns native + optional ERC-20 balance
+app.get("/v1/wallet/:address", async (req, res) => {
+  try {
+    const address = String(req.params.address || "").trim();
+    if (!address) return res.status(400).json({ error: "Missing address param" });
+
+    // Accept `network` query (legacy or CAIP-2) or fall back to server NETWORK
+    const networkQuery = (req.query.network as string | undefined) ?? NETWORK;
+    const network = networkQuery.toLowerCase();
+
+    // Optional token contract address (ERC-20). If not provided and network is avalanche-fuji, use common Fuji USDC
+    const tokenParam = (req.query.token as string | undefined) || undefined;
+
+    const DEFAULT_RPCS: Record<string, string> = {
+      base: "https://mainnet.base.org",
+      "base-sepolia": "https://sepolia.base.org",
+      polygon: "https://polygon-rpc.com",
+      "polygon-amoy": "https://rpc-amoy.polygon.technology",
+      avalanche: "https://api.avax.network/ext/bc/C/rpc",
+      "avalanche-fuji": "https://api.avax-test.network/ext/bc/C/rpc",
+      iotex: "https://rpc.ankr.com/iotex",
+      sei: "https://sei-rpc.publicnode.com",
+      "sei-testnet": "https://sei-testnet-rpc.publicnode.com",
+      peaq: "https://erpc.peaq.network",
+    };
+
+    const rpcUrl = RPC_URL || DEFAULT_RPCS[network] || DEFAULT_RPCS[networkQuery] || "https://rpc.ankr.com/eth";
+    const provider = new ethers.JsonRpcProvider(rpcUrl);
+
+    // Native balance
+    const nativeRaw = await provider.getBalance(address);
+    const nativeFormatted = ethers.formatEther(nativeRaw);
+
+    const response: any = {
+      address,
+      network,
+      rpcUrl,
+      native: {
+        raw: nativeRaw.toString(),
+        formatted: nativeFormatted,
+      },
+    };
+
+    // Determine token to query
+    let tokenAddress = tokenParam;
+    if (!tokenAddress) {
+      if (network === "avalanche-fuji" || network === "eip155:43113") {
+        tokenAddress = "0x5425890298aed601595a70AB815c96711a31Bc65"; // common Fuji USDC
+      }
+    }
+
+    if (tokenAddress) {
+      try {
+        const ERC20_ABI = [
+          "function balanceOf(address) view returns (uint256)",
+          "function decimals() view returns (uint8)",
+          "function symbol() view returns (string)",
+        ];
+        const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
+        const [rawBal, decimals, symbol] = await Promise.all([
+          tokenContract.balanceOf(address),
+          tokenContract.decimals().catch(() => 18),
+          tokenContract.symbol().catch(() => "TOKEN"),
+        ]);
+
+        const divisor = BigInt(10) ** BigInt(Number(decimals));
+        const formatted = (BigInt(rawBal.toString()) / divisor).toString();
+
+        response.token = {
+          address: tokenAddress,
+          symbol,
+          raw: rawBal.toString(),
+          decimals: Number(decimals),
+          formatted,
+        };
+      } catch (err) {
+        // Non-fatal — return without token balance
+        response.tokenError = (err as Error).message;
+      }
+    }
+
+    return res.json(response);
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || "Failed to get wallet info" });
+  }
 });
 
 // ✅ Paid REST endpoint
