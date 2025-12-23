@@ -1,4 +1,5 @@
-import grants from "./grants.seed.json" assert { type: "json" };
+// src/data/grants.ts
+import grantsJson from "./grants.seed.json" assert { type: "json" };
 
 export type GrantSeed = {
   id: string;
@@ -11,4 +12,5 @@ export type GrantSeed = {
   notes: string;
 };
 
-export const GRANTS = grants as GrantSeed[];
+// Explicitly cast through unknown to satisfy TS + NodeNext
+export const GRANTS: GrantSeed[] = grantsJson as unknown as GrantSeed[];
