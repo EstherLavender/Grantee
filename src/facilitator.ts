@@ -175,16 +175,29 @@ async function startFacilitator() {
   // =========================================================================
   // Initialize EVM
   // =========================================================================
-  const evmRpcUrl =
-    process.env.FACILITATOR_EVM_RPC_URL ||
-    "https://api.avax-test.network/ext/bc/C/rpc";
+  const evmRpcUrl = process.env.FACILITATOR_EVM_RPC_URL || "https://api.avax-test.network/ext/bc/C/rpc";
 
-  const viemChain = VIEM_CHAINS[EVM_NETWORK];
+  console.log(`🔧 Facilitator EVM_NETWORK=${EVM_NETWORK}`);
+  console.log(`🔧 Facilitator RPC URL: ${evmRpcUrl}`);
+
+  // Resolve viem chain (allow both legacy key or CAIP-2). Try to recover from CAIP-2 values.
+  let viemChain = VIEM_CHAINS[EVM_NETWORK];
+  if (!viemChain && EVM_NETWORK.startsWith("eip155:")) {
+    // Try to map CAIP-2 back to a supported legacy key
+    const legacyKey = Object.keys(NETWORK_TO_CAIP2).find((k) => NETWORK_TO_CAIP2[k] === EVM_NETWORK);
+    if (legacyKey) {
+      viemChain = VIEM_CHAINS[legacyKey];
+      console.log(`ℹ️  Mapped CAIP-2 ${EVM_NETWORK} -> legacy key ${legacyKey}`);
+    }
+  }
+
   if (!viemChain) {
-    console.error(`❌ Unknown EVM network "${EVM_NETWORK}"`);
+    console.error(`❌ Unknown or unsupported EVM network "${EVM_NETWORK}"`);
     console.error("   Supported networks:", Object.keys(VIEM_CHAINS).join(", "));
     process.exit(1);
   }
+
+  console.log(`✅ Resolved EVM chain: ${viemChain.name || "(unknown name)"} (id=${(viemChain as any).id})`);
 
   const evmPrivateKey = process.env.EVM_PRIVATE_KEY!.startsWith("0x")
     ? (process.env.EVM_PRIVATE_KEY as `0x${string}`)
@@ -243,14 +256,19 @@ async function startFacilitator() {
       viemClient.waitForTransactionReceipt(args),
   });
 
-  const evmCaip2 = getEvmCaip2Network(EVM_NETWORK);
-
-  registerExactEvmScheme(facilitator, {
-    signer: evmSigner,
-    networks: evmCaip2,
-  });
-
-  console.log(`🔗 Registered EVM network: ${evmCaip2}`);
+  let evmCaip2: string;
+  try {
+    evmCaip2 = getEvmCaip2Network(EVM_NETWORK);
+    registerExactEvmScheme(facilitator, {
+      signer: evmSigner,
+      networks: evmCaip2,
+    });
+    console.log(`🔗 Registered EVM network: ${evmCaip2}`);
+  } catch (err) {
+    console.error("❌ Failed to register EVM scheme with facilitator:", err instanceof Error ? err.message : String(err));
+    console.error("Ensure FACILITATOR_EVM_NETWORK is a supported legacy name (e.g. avalanche-fuji) or a valid CAIP-2 value (eip155:43113)");
+    process.exit(1);
+  }
 
   // =========================================================================
   // Initialize Express app
