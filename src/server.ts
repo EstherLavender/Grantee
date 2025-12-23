@@ -25,7 +25,7 @@ const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN; // e.g. https://grant-spark-api.lovable.app
 
 const PAY_TO_ADDRESS = process.env.PAY_TO_ADDRESS;
-const NETWORK = process.env.NETWORK || "avalanche-fuji";
+const NETWORK = (process.env.NETWORK || "avalanche-fuji").toLowerCase();
 
 const SETTLEMENT_MODE_ENV = process.env.SETTLEMENT_MODE?.toLowerCase();
 const RPC_URL = process.env.RPC_URL;
