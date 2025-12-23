@@ -91,7 +91,7 @@ function getPaymentPayloadFromRequest(req: express.Request): PaymentPayload | un
 }
 
 // =============================================================================
-// CORS (✅ FIXED FOR LOVABLE + x402)
+// CORS allowlist
 // =============================================================================
 const allowedOrigins = new Set<string>([
   "http://localhost:3000",
@@ -101,27 +101,89 @@ const allowedOrigins = new Set<string>([
   ...(FRONTEND_ORIGIN ? [FRONTEND_ORIGIN] : []),
 ]);
 
+function isAllowedOrigin(origin?: string) {
+  if (!origin) return true; // non-browser clients (curl)
+  if (allowedOrigins.has(origin)) return true;
+  if (origin.endsWith(".lovable.app") || origin.endsWith(".lovableproject.com")) return true;
+  return false;
+}
+
+// =============================================================================
+// BULLETPROOF PREFLIGHT HANDLER (Render/browser-safe)
+// MUST be before cors() middleware
+// =============================================================================
+app.use((req, res, next) => {
+  if (req.method !== "OPTIONS") return next();
+
+  const origin = req.headers.origin as string | undefined;
+
+  if (!isAllowedOrigin(origin)) {
+    return res.sendStatus(403);
+  }
+
+  if (origin) res.setHeader("Access-Control-Allow-Origin", origin);
+  res.setHeader("Vary", "Origin");
+
+  // Echo requested headers exactly (fixes "x-402-payment not allowed")
+  const reqHeaders = req.headers["access-control-request-headers"];
+  if (reqHeaders) {
+    res.setHeader("Access-Control-Allow-Headers", String(reqHeaders));
+  } else {
+    // fallback
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      [
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "x-402-payment",
+        "x402-payment",
+        "x-402-payment-payload",
+        "x402-payment-payload",
+        "payment-required",
+        "payment-response",
+        "x-payment",
+        "x-payment-request",
+        "x-payment-response",
+      ].join(", "),
+    );
+  }
+
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+
+  // Expose payment headers so frontend can read them
+  res.setHeader(
+    "Access-Control-Expose-Headers",
+    [
+      "payment-required",
+      "payment-response",
+      "x-payment-response",
+      "x402-payment-required",
+      "x-402-payment-required",
+      "x402-payment-response",
+      "x-402-payment-response",
+      "www-authenticate",
+    ].join(", "),
+  );
+
+  return res.sendStatus(204);
+});
+
+// =============================================================================
+// CORS (normal requests)
+// =============================================================================
 const corsOptions: CorsOptions = {
   origin: (origin, cb) => {
-    // Allow non-browser clients (curl, server-to-server) that send no Origin.
-    if (!origin) return cb(null, true);
-
-    if (allowedOrigins.has(origin)) return cb(null, true);
-
-    // Allow Lovable subdomains (both .lovable.app and .lovableproject.com)
-    if (origin.endsWith(".lovable.app") || origin.endsWith(".lovableproject.com")) return cb(null, true);
-
+    if (isAllowedOrigin(origin)) return cb(null, true);
     return cb(new Error(`CORS blocked for origin: ${origin}`), false);
   },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-
-  // ✅ MUST explicitly include the header Lovable/x402 sends and variants
   allowedHeaders: [
     "Content-Type",
     "Authorization",
     "X-Requested-With",
 
-    // x402 / Lovable headers (both hyphenated and non-hyphenated variants)
+    // x402 / Lovable headers
     "x-402-payment",
     "x-402-payment-authorization",
     "x-402-signature",
@@ -133,7 +195,7 @@ const corsOptions: CorsOptions = {
     "x402-payment-required",
     "x402-client",
 
-    // Additional x402-like headers requested
+    // Additional headers
     "payment-signature",
     "payment-required",
     "payment-response",
@@ -141,26 +203,21 @@ const corsOptions: CorsOptions = {
     "x-payment-response",
     "x-payment-request",
   ],
-
-  // ✅ Expose so browser can read required payment-required headers
   exposedHeaders: [
     "x-402-payment-required",
     "x402-payment-required",
     "payment-required",
-
     "x-402-payment-response",
     "x402-payment-response",
     "payment-response",
     "x-payment-response",
-
     "www-authenticate",
   ],
-
   credentials: false,
   optionsSuccessStatus: 204,
 };
 
-// Must come BEFORE routes (✅ already correct)
+// Must come BEFORE routes
 app.use(cors(corsOptions));
 app.use((req, res, next) => {
   res.setHeader("Vary", "Origin");
@@ -209,7 +266,7 @@ if (!isValidNetwork) {
   process.exit(1);
 }
 
-// Settlement mode selection (you want direct on Render)
+// Settlement mode selection
 let settlementMode: "facilitator" | "direct";
 if (SETTLEMENT_MODE_ENV === "local" || SETTLEMENT_MODE_ENV === "direct") {
   settlementMode = "direct";
@@ -247,22 +304,18 @@ const merchantOptions: MerchantExecutorOptions = {
   resourceDescription: "Analyzes a GitHub repo, scores quality, and matches grants.",
   mimeType: "application/json",
 
-  // Direct settlement (Render)
   settlementMode,
   rpcUrl: RPC_URL,
   privateKey: PRIVATE_KEY,
 
-  // Facilitator mode (optional)
   facilitatorUrl: FACILITATOR_URL,
   facilitatorApiKey: FACILITATOR_API_KEY,
 
-  // Asset + chain metadata
   assetAddress: ASSET_ADDRESS,
   assetName: ASSET_NAME,
   explorerUrl: EXPLORER_URL,
   chainId: CHAIN_ID,
 
-  // Prefer PUBLIC_BASE_URL for metadata/resource URLs (not localhost)
   resourceUrl: `${PUBLIC_BASE_URL}/v1/github/analyze-paid`,
 };
 
@@ -342,11 +395,9 @@ app.get("/v1/wallet/:address", async (req, res) => {
 
     let tokenAddress = tokenParam;
     if (!tokenAddress) {
-      // Fuji USDC (commonly used on Fuji testnet)
       if (network === "avalanche-fuji" || network === "eip155:43113") {
         tokenAddress = "0x5425890298aed601595a70AB815c96711a31Bc65";
       }
-      // Avalanche mainnet USDC.e (common)
       if (network === "avalanche" || network === "eip155:43114") {
         tokenAddress = "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E";
       }
@@ -371,7 +422,7 @@ app.get("/v1/wallet/:address", async (req, res) => {
           symbol,
           raw: rawBal.toString(),
           decimals: Number(decimals),
-          formatted: ethers.formatUnits(rawBal, Number(decimals)), // ✅ FIX: keep decimals
+          formatted: ethers.formatUnits(rawBal, Number(decimals)),
         };
       } catch (err) {
         response.tokenError = (err as Error).message;
@@ -392,10 +443,7 @@ app.post("/v1/github/analyze-paid", async (req, res) => {
     // 1) If no payment => 402 requirements
     if (!paymentPayload) {
       const paymentRequired = merchantExecutor.createPaymentRequiredResponse();
-
-      // ✅ CRITICAL: put payment requirements in headers so browser clients can read it
       setPaymentRequiredHeaders(res, paymentRequired);
-
       return res.status(402).json(paymentRequired);
     }
 
@@ -427,10 +475,9 @@ app.post("/v1/github/analyze-paid", async (req, res) => {
       githubToken: process.env.GITHUB_TOKEN,
     });
 
-    // 5) Settle payment (direct settlement will broadcast tx)
+    // 5) Settle payment
     const settlement = await merchantExecutor.settlePayment(paymentPayload);
 
-    // Helpful response headers
     res.setHeader("payment-response", JSON.stringify({ settled: settlement.success }));
     res.setHeader("x-payment-response", JSON.stringify({ settled: settlement.success }));
 
