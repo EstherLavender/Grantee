@@ -1,7 +1,8 @@
 # Dependencies
 node_modules/
 
-package-lock.json
+# Allow package-lock.json (needed for Render npm ci)
+!package-lock.json
 
 # Build output
 dist/
