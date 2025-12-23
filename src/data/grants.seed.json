@@ -1,12 +1,212 @@
 [
   {
-    "id": "avax-fuji-builders-001",
-    "program": "Avalanche Builders (Fuji-friendly)",
+    "id": "avax-ecosystem-fund",
+    "program": "Avalanche Ecosystem Fund",
     "ecosystem": "Avalanche",
-    "chains": ["avalanche", "avalanche-fuji", "eip155:43113"],
-    "tags": ["evm", "infra", "consumer", "defi", "gaming"],
+    "chains": ["avalanche", "avalanche-fuji", "eip155:43114"],
+    "tags": ["evm", "defi", "infra", "nft", "gaming"],
+    "preferredLanguages": ["Solidity", "TypeScript", "Rust"],
+    "minQualityScore": 50,
+    "notes": "Supports innovative projects building on Avalanche mainnet. Up to $1M+ for mature projects."
+  },
+  {
+    "id": "polygon-grant-accelerator",
+    "program": "Polygon Grants & Accelerator",
+    "ecosystem": "Polygon",
+    "chains": ["polygon", "polygon-amoy", "eip155:137"],
+    "tags": ["evm", "consumer", "defi", "infra", "gaming"],
     "preferredLanguages": ["Solidity", "TypeScript"],
     "minQualityScore": 45,
-    "notes": "Fuji testnet acceptable for prototypes; prioritize Avalanche-aligned demos."
+    "notes": "Focuses on scaling dApps and infrastructure. Grants up to $200k+ for qualified teams."
+  },
+  {
+    "id": "base-grants",
+    "program": "Base Grants & Ecosystem Fund",
+    "ecosystem": "Base (Coinbase L2)",
+    "chains": ["base", "base-sepolia", "eip155:8453"],
+    "tags": ["evm", "consumer", "defi"],
+    "preferredLanguages": ["Solidity", "TypeScript"],
+    "minQualityScore": 40,
+    "notes": "Supports onchain builders on Base. Grants available for apps, infrastructure, and education."
+  },
+  {
+    "id": "optimism-governance-fund",
+    "program": "Optimism Governance Fund",
+    "ecosystem": "Optimism",
+    "chains": ["eip155:10"],
+    "tags": ["evm", "consumer", "defi", "infra"],
+    "preferredLanguages": ["Solidity", "TypeScript"],
+    "minQualityScore": 50,
+    "notes": "Community-governed grants for projects building on Optimism. OP token rewards available."
+  },
+  {
+    "id": "arbitrum-grants",
+    "program": "Arbitrum Foundation Grants",
+    "ecosystem": "Arbitrum",
+    "chains": ["eip155:42161"],
+    "tags": ["evm", "defi", "infra", "consumer"],
+    "preferredLanguages": ["Solidity", "TypeScript", "Rust"],
+    "minQualityScore": 45,
+    "notes": "Supports core infrastructure, tooling, and dApps on Arbitrum."
+  },
+  {
+    "id": "starknet-grants",
+    "program": "StarkNet Grant Program",
+    "ecosystem": "StarkNet",
+    "chains": ["eip155:534353"],
+    "tags": ["cairo", "infra", "defi", "consumer"],
+    "preferredLanguages": ["Cairo", "Rust", "TypeScript"],
+    "minQualityScore": 55,
+    "notes": "Supports developers building on StarkNet. Focuses on tooling, infrastructure, and dApps."
+  },
+  {
+    "id": "bitcoin-lightning-labs",
+    "program": "Bitcoin Lightning Labs (LDK Grants)",
+    "ecosystem": "Bitcoin / Lightning Network",
+    "chains": ["bitcoin", "lightning"],
+    "tags": ["bitcoin", "infra", "payment", "devtools"],
+    "preferredLanguages": ["Rust", "Go", "Python"],
+    "minQualityScore": 55,
+    "notes": "Supports Bitcoin and Lightning Network development. Emphasis on privacy, security, and UX."
+  },
+  {
+    "id": "bitcoin-dev-kit",
+    "program": "Bitcoin Dev Kit (BDK) Foundation",
+    "ecosystem": "Bitcoin",
+    "chains": ["bitcoin"],
+    "tags": ["bitcoin", "devtools", "infra", "consumer"],
+    "preferredLanguages": ["Rust", "Python", "Go"],
+    "minQualityScore": 50,
+    "notes": "Grants for tools, wallets, and applications on Bitcoin and related protocols."
+  },
+  {
+    "id": "stacks-grants",
+    "program": "Stacks Grants Program",
+    "ecosystem": "Stacks (Bitcoin L2)",
+    "chains": ["stacks"],
+    "tags": ["bitcoin", "defi", "nft", "consumer"],
+    "preferredLanguages": ["Clarity", "TypeScript"],
+    "minQualityScore": 45,
+    "notes": "Supports smart contracts and dApps on Stacks (Bitcoin-secured layer 2)."
+  },
+  {
+    "id": "solana-grants",
+    "program": "Solana Foundation Grants",
+    "ecosystem": "Solana",
+    "chains": ["solana"],
+    "tags": ["infra", "consumer", "defi", "gaming", "nft"],
+    "preferredLanguages": ["Rust", "TypeScript"],
+    "minQualityScore": 48,
+    "notes": "Supports builders on Solana ecosystem. Grants for core infrastructure, apps, and education."
+  },
+  {
+    "id": "near-grants",
+    "program": "NEAR Foundation Grants",
+    "ecosystem": "NEAR",
+    "chains": ["near"],
+    "tags": ["infra", "consumer", "defi"],
+    "preferredLanguages": ["Rust", "TypeScript"],
+    "minQualityScore": 45,
+    "notes": "Supports projects building on NEAR Protocol. Community and ecosystem focus."
+  },
+  {
+    "id": "cosmos-grants",
+    "program": "Cosmos Grants",
+    "ecosystem": "Cosmos",
+    "chains": ["cosmos"],
+    "tags": ["infra", "consumer", "defi"],
+    "preferredLanguages": ["Go", "TypeScript", "Rust"],
+    "minQualityScore": 50,
+    "notes": "Supports interoperability infrastructure and dApps in the Cosmos ecosystem."
+  },
+  {
+    "id": "web3-foundation",
+    "program": "Web3 Foundation Grants",
+    "ecosystem": "Polkadot / Kusama",
+    "chains": ["polkadot", "kusama"],
+    "tags": ["infra", "devtools", "consumer"],
+    "preferredLanguages": ["Rust", "TypeScript", "Go"],
+    "minQualityScore": 55,
+    "notes": "Grants for infrastructure, UX, and applications on Polkadot and Kusama."
+  },
+  {
+    "id": "filecoin-grants",
+    "program": "Filecoin Grants & Accelerator",
+    "ecosystem": "Filecoin",
+    "chains": ["filecoin"],
+    "tags": ["infra", "storage", "consumer"],
+    "preferredLanguages": ["Go", "Rust", "TypeScript"],
+    "minQualityScore": 50,
+    "notes": "Supports tools, apps, and infrastructure leveraging Filecoin storage."
+  },
+  {
+    "id": "ipfs-grants",
+    "program": "IPFS & Protocol Labs Grants",
+    "ecosystem": "IPFS / Web3 Infrastructure",
+    "chains": ["ipfs"],
+    "tags": ["infra", "devtools", "consumer"],
+    "preferredLanguages": ["Go", "Rust", "TypeScript", "Python"],
+    "minQualityScore": 50,
+    "notes": "Grants for distributed systems, IPFS tools, and decentralized web applications."
+  },
+  {
+    "id": "gitcoin-allo",
+    "program": "Gitcoin Allo & Public Goods Funding",
+    "ecosystem": "Multi-chain",
+    "chains": ["evm"],
+    "tags": ["consumer", "infra", "devtools", "ai"],
+    "preferredLanguages": ["TypeScript", "Solidity", "Python"],
+    "minQualityScore": 40,
+    "notes": "Community-driven quadratic funding. Open to public goods across all EVM chains."
+  },
+  {
+    "id": "safe-grants",
+    "program": "Safe (Gnosis) Grants",
+    "ecosystem": "Multi-chain (Smart Contract Wallets)",
+    "chains": ["evm"],
+    "tags": ["infra", "devtools"],
+    "preferredLanguages": ["Solidity", "TypeScript"],
+    "minQualityScore": 50,
+    "notes": "Supports infrastructure and tools for Safe smart contract wallets."
+  },
+  {
+    "id": "zcash-grants",
+    "program": "Zcash Community Grants",
+    "ecosystem": "Zcash",
+    "chains": ["zcash"],
+    "tags": ["bitcoin", "privacy", "infra"],
+    "preferredLanguages": ["Rust", "Go", "Python"],
+    "minQualityScore": 50,
+    "notes": "Grants for privacy-focused tools, applications, and infrastructure on Zcash."
+  },
+  {
+    "id": "monero-ccs",
+    "program": "Monero Community Crowdfunding System",
+    "ecosystem": "Monero",
+    "chains": ["monero"],
+    "tags": ["bitcoin", "privacy", "infra"],
+    "preferredLanguages": ["C++", "Python"],
+    "minQualityScore": 50,
+    "notes": "Community-funded initiatives for Monero development and ecosystem growth."
+  },
+  {
+    "id": "ai-chainlink-oracles",
+    "program": "Chainlink Grants & Accelerator",
+    "ecosystem": "Multi-chain (Oracles)",
+    "chains": ["evm"],
+    "tags": ["infra", "ai", "defi"],
+    "preferredLanguages": ["Solidity", "TypeScript", "Go"],
+    "minQualityScore": 50,
+    "notes": "Supports oracle integrations, automation, and data-driven dApps across EVM chains."
+  },
+  {
+    "id": "uniswap-grants",
+    "program": "Uniswap Grants Program",
+    "ecosystem": "Multi-chain (DEX Infrastructure)",
+    "chains": ["evm"],
+    "tags": ["defi", "consumer", "devtools"],
+    "preferredLanguages": ["Solidity", "TypeScript"],
+    "minQualityScore": 50,
+    "notes": "Grants for tools, infrastructure, and applications leveraging Uniswap."
   }
 ]
