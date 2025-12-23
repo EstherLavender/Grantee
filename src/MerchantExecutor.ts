@@ -414,10 +414,14 @@ export class MerchantExecutor {
 
   async verifyPayment(payload: PaymentPayload): Promise<VerifyResult> {
     console.log("\n🔍 Verifying payment...");
+    // Diagnostic: log accepted payload and current requirements
+    try {
+      console.log(`   Payload accepted: ${JSON.stringify((payload as any).accepted ?? {})}`);
+    } catch {}
     console.log(`   Network: ${(payload as any).accepted?.network || this.network}`);
     console.log(`   Scheme: ${(payload as any).accepted?.scheme || "exact"}`);
     console.log(`   To: ${this.requirements.payTo}`);
-    console.log(`   Amount: ${this.requirements.amount}`);
+    console.log(`   Amount (requirement): ${this.requirements.amount}`);
 
     try {
       const result =
@@ -443,8 +447,12 @@ export class MerchantExecutor {
 
   async settlePayment(payload: PaymentPayload): Promise<SettlementResult> {
     console.log("\n💰 Settling payment...");
+    // Diagnostic: log payload and requirement info
+    try {
+      console.log(`   Payload accepted: ${JSON.stringify((payload as any).accepted ?? {})}`);
+    } catch {}
     console.log(`   Network: ${this.network}`);
-    console.log(`   Amount: ${this.requirements.amount} (micro units)`);
+    console.log(`   Amount (requirement): ${this.requirements.amount} (micro units)`);
     console.log(`   Pay to: ${this.requirements.payTo}`);
 
     try {
@@ -626,23 +634,36 @@ export class MerchantExecutor {
 
   private async callFacilitator<T>(endpoint: "verify" | "settle", payload: PaymentPayload): Promise<T> {
     if (!this.facilitatorUrl) throw new Error("Facilitator URL is not configured.");
+    const body = JSON.stringify({
+      x402Version: 2,
+      paymentPayload: payload,
+      paymentRequirements: this.requirements,
+    });
+
+    console.log(`→ Calling facilitator ${this.facilitatorUrl}/${endpoint} with body: ${body.length} bytes`);
 
     const response = await fetch(`${this.facilitatorUrl}/${endpoint}`, {
       method: "POST",
       headers: this.buildHeaders(),
-      body: JSON.stringify({
-        x402Version: 2,
-        paymentPayload: payload,
-        paymentRequirements: this.requirements,
-      }),
+      body,
     });
 
+    const text = await response.text().catch(() => "");
     if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Facilitator ${endpoint} failed (${response.status}): ${text || response.statusText}`);
+      // Try to surface JSON error if present
+      let parsed: any = undefined;
+      try {
+        parsed = JSON.parse(text || "null");
+      } catch {}
+      const detail = parsed?.error || text || response.statusText;
+      throw new Error(`Facilitator ${endpoint} failed (${response.status}): ${detail}`);
     }
 
-    return (await response.json()) as T;
+    try {
+      return JSON.parse(text) as T;
+    } catch (err) {
+      throw new Error(`Failed to parse facilitator ${endpoint} response: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   private buildEip712Domain(requirements: PaymentRequirements) {
